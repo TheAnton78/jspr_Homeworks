@@ -1,23 +1,45 @@
+import java.io.BufferedOutputStream;
 import java.io.IOException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class Main {
+    public static void main(String[] args){
+        final var server = new Server();
 
-    static ExecutorService executeIt = Executors.newFixedThreadPool(64);
-
-    public static void main(String[] args) {
-        try(final var serverSocket = new ServerSocket(9998)){
-            while (!serverSocket.isClosed()) {
-                Socket client = serverSocket.accept();
-                executeIt.execute(new MonoThreadServer(client));
-                System.out.print("Connection accepted.");
+        // добавление хендлеров (обработчиков)
+        server.addHandler("GET", "/messages", new Handler() {
+            public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
+                final var filePath = Path.of(".","public", "response");
+                final var mimeType = Files.probeContentType(filePath);
+                responseStream.write((
+                        "HTTP/1.1 200 OK\r\n" +
+                                "Content-Type: " + mimeType + "\r\n" +
+                                "Content-Length: " + Files.size(filePath) + "\r\n" +
+                                "Connection: close\r\n" +
+                                "\r\n"
+                ).getBytes());
+                Files.copy(filePath,responseStream);
+                responseStream.flush();
             }
-            executeIt.shutdown();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        });
+        server.addHandler("POST", "/messages", new Handler() {
+            public void handle(Request request, BufferedOutputStream responseStream) throws IOException {
+                final var filePath = Path.of(".","public", "postResponse");
+                final var mimeType = Files.probeContentType(filePath);
+                responseStream.write((
+                        "HTTP/1.1 200 OK\r\n" +
+                                "Content-Type: " + mimeType + "\r\n" +
+                                "Content-Length: " + Files.size(filePath) + "\r\n" +
+                                "Connection: close\r\n" +
+                                "\r\n"
+                ).getBytes());
+                Files.copy(filePath,responseStream);
+                responseStream.flush();
+            }
+        });
+
+        Server.listen(9998);
     }
 }
+
